@@ -1,28 +1,36 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, SafeAreaView, Text, View, FlatList, TouchableOpacity } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Colors } from '../constants/colors';
 import { useNavigation } from '@react-navigation/native';
-
-const DATA = [
-  { id: '1', title: 'Super' },
-  { id: '2', title: 'Kiosko' },
-  { id: '3', title: 'Farmacia' },
-  { id: '4', title: 'Asado del finde' },
-  { id: '5', title: 'Previa de Sab' },
-  { id: '6', title: 'Compra del mes' },
-];
+import { setupDB, getLists, insertList, deleteAllLists } from '../db/db';
 
 const ListsScreen = () => {
   const navigation = useNavigation();
+  const [lists, setLists] = useState([]);
+  const [newList, setNewList] = useState('');
 
-  const handleNewList = (points) => {
-    console.log(points);
+  const initDB = async () => {
+    await setupDB();
+    const data = await getLists();
+    setLists(data);
+  };
+
+  useEffect(() => {
+    initDB();
+  }, []);
+
+  const handleAddList = () => {
     navigation.navigate('NewList');
   };
 
-  const onPressPlus = () => {
+  const handleDeleteAll = async () => {
+    await deleteAllLists();
+    setLists([]);
+  };  
 
+  const handleOnPressList = (listId) => {
+    navigation.navigate('List', { id: listId });
   };
 
   const listHeader = () => {
@@ -37,20 +45,25 @@ const ListsScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
-        data={DATA}
+        data={lists}
         ListHeaderComponent={() => listHeader()}
         renderItem={({ item }) => (
           <View style={styles.list}>
-            <Text style={styles.listName}>{item.title}</Text>
+            <TouchableOpacity onPress={() => handleOnPressList(item.id)} >
+              <Text style={styles.listName}>{item.name}</Text>
+            </TouchableOpacity>
           </View>
         )}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id.toString()}
         ListEmptyComponent={<Text style={{ color: 'red' }}>No hay datos</Text>}
       />
 
-      <TouchableOpacity onPress={handleNewList} style={styles.button} >
+      <TouchableOpacity onPress={handleAddList} style={styles.button} >
         <FontAwesome name='plus' size={30} color='white' />
         <Text style={styles.text}>Nueva Lista</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={handleDeleteAll} style={styles.deleteButton}>
+        <Text style={{ color: 'white' }}>Eliminar Todas</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
