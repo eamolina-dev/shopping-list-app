@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { Products } from '../constants/products'; // Ajusta la ruta según la ubicación real
 
 const openDB = async () => {
   try {
@@ -12,6 +13,7 @@ const openDB = async () => {
 export const setupDB = async () => {
   try {
     const db = await openDB();
+    
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS lists (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -29,9 +31,47 @@ export const setupDB = async () => {
       );
     `);
 
-    console.log("Tablas creadas o verificadas correctamente.");
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE
+      );
+    `);
+
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS ListItems (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        list_id INTEGER NOT NULL,
+        product_id INTEGER NOT NULL,
+        FOREIGN KEY(list_id) REFERENCES lists(id) ON DELETE CASCADE,
+        FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE,
+        UNIQUE(list_id, product_id) -- Evita duplicados en la misma lista
+      );
+    `);
+
+    await insertProductsIfNotExists();
+
+    const products = await db.getAllAsync('SELECT * FROM products');
+    console.log(products);
+
+    console.log("Base de datos configurada correctamente.");
   } catch (error) {
     console.error("Error al configurar la base de datos:", error);
+  }
+};
+
+const insertProductsIfNotExists = async () => {
+  try {
+    const db = await openDB();
+
+    const insertQuery = 'INSERT OR IGNORE INTO products (name) VALUES (?)';
+    for (const product of Products) {
+      await db.runAsync(insertQuery, [product.name]);
+    }
+
+    console.log("Productos insertados correctamente.");
+  } catch (error) {
+    console.error("Error al insertar productos:", error);
   }
 };
 
@@ -93,7 +133,7 @@ export const deleteAllLists = async () => {
 export const getItems = async () => {
   try {
     const db = await openDB();
-    return await db.getAllAsync('SELECT * FROM items');
+    return await db.getAllAsync('SELECT * FROM products');
   } catch (error) {
     console.error("Error al obtener ítems:", error);
     return [];
@@ -108,6 +148,19 @@ export const insertItem = async (name, listId) => {
     console.log("Ítem insertado con éxito.");
   } catch (error) {
     console.error("Error al insertar ítem:", error);
+  }
+};
+
+export const insertItemIntoList = async (listId, productId) => {
+  try {
+    const db = await openDB();
+    await db.runAsync(
+      'INSERT OR IGNORE INTO ListItems (list_id, product_id) VALUES (?, ?)',
+      [listId, productId]
+    );
+    console.log("Ítem insertado en la lista con éxito.");
+  } catch (error) {
+    console.error("Error al insertar ítem en la lista:", error);
   }
 };
 
@@ -135,7 +188,12 @@ export const deleteItem = async (id) => {
 export const getItemsByList = async (listId) => {
   try {
     const db = await openDB();
-    return await db.getAllAsync('SELECT * FROM items WHERE list_id = ?', [listId]);
+    return await db.getAllAsync(`
+      SELECT p.id, p.name 
+      FROM ListItems li
+      JOIN products p ON li.product_id = p.id
+      WHERE li.list_id = ?
+    `, [listId]);
   } catch (error) {
     console.error("Error al obtener ítems de la lista:", error);
     return [];
@@ -149,5 +207,22 @@ export const markItemAcquired = async (id, acquired) => {
     console.log("Ítem actualizado como adquirido/no adquirido.");
   } catch (error) {
     console.error("Error al marcar ítem como adquirido:", error);
+  }
+};
+
+export const clearDatabase = async () => {
+  try {
+    const db = await openDB();
+    await db.execAsync(`
+      DROP TABLE IF EXISTS ListItems;
+      DROP TABLE IF EXISTS items;
+      DROP TABLE IF EXISTS lists;
+      DROP TABLE IF EXISTS products;
+    `);
+    console.log("Tablas eliminadas correctamente.");
+    
+    await setupDB(); // Recrea la base de datos
+  } catch (error) {
+    console.error("Error al limpiar la base de datos:", error);
   }
 };
