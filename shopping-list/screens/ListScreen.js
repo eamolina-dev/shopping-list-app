@@ -1,135 +1,80 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, SafeAreaView, Text, TouchableOpacity, FlatList, View } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { StyleSheet, SafeAreaView, Text, View } from 'react-native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { getItems, insertItemIntoList, getItemsByList } from '../db/db';
 import { Colors } from '../constants/colors';
-import { useNavigation } from '@react-navigation/native';
-import { Products } from '../constants/products';
-import ItemIcon from '../components/ItemIcon';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import Modal from "react-native-modal";
+import Modal from 'react-native-modal';
+import List from '../components/List';
+import Button from '../components/Button';
 
 const ListScreen = () => {
   const route = useRoute();
+  const navigation = useNavigation();
   const { id } = route.params;
+  
   const [items, setItems] = useState([]);
   const [products, setProducts] = useState([]);
-  const navigation = useNavigation();
   const [modalIsVisible, setModalIsVisible] = useState(false);
 
-  // useEffect(() => {
-  //   const fetchItems = async () => {
-  //     const data = await getItemsByList(id);
-  //     setItems(data);
-  //   };
-
-  //   fetchItems();
-  // }, [id]);
-
   useEffect(() => {
-    const fetchItems = async () => {
-      const data = await getItems();
-      setProducts(data);
+    const fetchData = async () => {
+      const listItems = await getItemsByList(id);
+      const allProducts = await getItems();
+      setItems(listItems);
+      setProducts(allProducts);
     };
+    fetchData();
+  }, [id]);
 
-    fetchItems();
-    console.log(products);
-  }, []);
-
-  const handleBackToLists = () => {
-    navigation.navigate('Lists');
-  };
-
-  const handleAddItem = () => {
-    navigation.navigate('NewItem');
-  };
-
-  const handleSelectItem = () => {
-    setModalIsVisible(true);
-  };
-
-  const handleSelectItem2 = async (itemID) => {
-    //await insertItem(itemName, id);
-    await insertItemIntoList(id, itemID);
-    const newItems = await getItemsByList(id);
-    setItems(newItems);
-
-    const newProducts = products.filter(p => p.id !== itemID);
-    setProducts(newProducts);
-  };
+  const handleBackToLists = () => navigation.navigate('Lists');
+  const handleAddItem = () => navigation.navigate('NewItem');
+  const handleSelectItem = () => setModalIsVisible(true);
   
-
-
-  const listHeader = () => {
-    return(
-      <View>
-        <Text style={styles.listHeader}>Lista ID: {id}</Text>
-        <View style={styles.divider} />
-      </View>
-    );
+  const handleSelectItem2 = async (itemID) => {
+    await insertItemIntoList(id, itemID);
+    setItems(await getItemsByList(id));
+    setProducts(products.filter(p => p.id !== itemID));
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <FlatList
-        data={items.reverse()}
-        ListHeaderComponent={() => listHeader()}
-        renderItem={({ item }) => (
-          <View style={styles.list}>
-            <TouchableOpacity onPress={() => handleOnPressList(item.id)} >
-              <ItemIcon name={item.name} />
-              <View style={styles.itemContent}>
-                <Text style={styles.listName}>{item.name}</Text>
-                <FontAwesome name='plus' size={24} color='black' />
-              </View>
-            </TouchableOpacity>
-          </View>
-        )}
-        keyExtractor={(item) => item.id.toString()}
-        ListEmptyComponent={<Text style={{ color: 'red' }}>No hay datos</Text>}
+      <List 
+        data={[...items].reverse()}
+        listHeader={() => <ListHeader id={id} />}
+        onPressItem={() => {}}
+        itemStyle={styles.list}
+        itemContentStyle={styles.itemContent}
+        itemNameStyle={styles.listName}
       />
-
+      
       <Text style={styles.text}>Agregar Producto</Text>
-      <TouchableOpacity onPress={handleSelectItem} style={styles.button} >
-        <FontAwesome name='list' size={24} color='white' />
-        <Text style={styles.text}>Seleccionar</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={handleAddItem} style={styles.button} >
-        <FontAwesome name='plus' size={30} color='white' />
-        <Text style={styles.text}>Nuevo</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={handleBackToLists} style={styles.button}>
-        <Text style={styles.text}>Volver a Listas</Text>
-      </TouchableOpacity>
-
-      <Modal 
-        isVisible={modalIsVisible}
-        onBackdropPress={() => setModalIsVisible(false)}
-        style={styles.modalContainer}  
-      >
+      <View style={styles.buttonContainer}>
+        <Button text='Seleccionar' onPressButton={handleSelectItem} iconName='list' iconSize={24} iconColor='white' />
+        <Button text='Nuevo' onPressButton={handleAddItem} iconName='plus' iconSize={30} iconColor='white' />
+        <Button text='Volver a Listas' onPressButton={handleBackToLists} />
+      </View>
+      
+      <Modal isVisible={modalIsVisible} onBackdropPress={() => setModalIsVisible(false)} style={styles.modalContainer}>
         <View style={styles.modal}>
-          <FlatList
+          <List 
             data={products}
-            // ListHeaderComponent={() => listHeader()}
-            renderItem={({ item }) => (
-              <View style={styles.list}>
-                <TouchableOpacity onPress={() => handleSelectItem2(item.id)} >
-                  <ItemIcon name={item.name} />
-                  <View style={styles.itemContent}>
-                    <Text style={styles.listName}>{item.name}</Text>
-                    <FontAwesome name='plus' size={24} color='black' />
-                  </View>
-                </TouchableOpacity>
-              </View>
-            )}
-            keyExtractor={(item) => item.name.toString()}
-            ListEmptyComponent={<Text style={{ color: 'red' }}>No hay datos</Text>}
+            onPressItem={handleSelectItem2}
+            itemStyle={styles.list}
+            itemContentStyle={styles.itemContent}
+            itemNameStyle={styles.listName}
           />
         </View>
       </Modal>
     </SafeAreaView>
   );
 };
+
+const ListHeader = ({ id }) => (
+  <View>
+    <Text style={styles.listHeader}>Lista ID: {id}</Text>
+    <View style={styles.divider} />
+  </View>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -140,29 +85,19 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 18,
-    color: 'white'
+    color: 'white',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
   },
   itemContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  icon: {
-    marginRight: 8
-  },
-  button: {
-    height: 56,
-    width: 170,
-    borderRadius: 20,
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
-    margin: 8,
-    borderColor: Colors.green,
-    borderWidth: 6,
-    flexDirection: 'row',
-  },
   list: {
-    // minHeight: 60,
     height: 40,
     backgroundColor: Colors.green,
     paddingHorizontal: 16,
@@ -172,20 +107,19 @@ const styles = StyleSheet.create({
   },
   listName: {
     fontSize: 20,
-    // fontWeight: 'bold',
     color: 'white',
     paddingLeft: 40,
   },
   listHeader: {
-    fontSize: 24, 
-    fontWeight: 'bold', 
+    fontSize: 24,
+    fontWeight: 'bold',
     color: 'white',
   },
   divider: {
     height: 4,
     backgroundColor: Colors.orange,
     marginVertical: 16,
-    width: 140
+    width: 140,
   },
   modal: {
     backgroundColor: 'grey',
@@ -193,7 +127,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   modalContainer: {
-    justifyContent: "flex-end",
+    justifyContent: 'flex-end',
     margin: 0,
   },
 });
